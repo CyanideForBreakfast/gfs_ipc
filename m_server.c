@@ -8,6 +8,8 @@
 #include <semaphore.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <mqueue.h>
+#include <errno.h>
 
 #define NAME_SIZE 20
 #define BUFFER_SIZE 200
@@ -21,12 +23,14 @@
 #define SEM_NAME_M_SERVER "M_SERVER"
 #define SEM_NAME_D_SERVER "D_SERVER"
 
+char buffer[BUFFER_SIZE];
+
 sem_t *s_client;
 sem_t *s_m_server;
 sem_t *s_d_server;
 
-int m_server_mq;
-int client_mq;
+mqd_t m_server_mq;
+mqd_t client_mq;
 
 /* store unused chunk ids here
  * when assigning chunk ids make sure num_unused_chunk_ids is 0
@@ -122,19 +126,23 @@ int main()
 	s_m_server = sem_open(SEM_NAME_M_SERVER, O_RDWR);
 	s_d_server = sem_open(SEM_NAME_D_SERVER, O_RDWR);
 
-	m_server_mq = msgget(ftok("./m_server.c", 99), 0666 | IPC_CREAT);
-	client_mq = msgget(ftok("./client.c",99),0666|IPC_CREAT);
-	//printf("m_server started\n");
-	printf("m_server M_SERVER %d\n", m_server_mq);
+	char client_path[] = "/client.c"; char m_server_path[] = "/m_server.c"; char d_server_path[] = "/d_server.c";
+	client_mq = mq_open(client_path,O_WRONLY);
+	if(client_mq==-1) printf("client_mq %s m_server.c\n",strerror(errno));
+	m_server_mq = mq_open(m_server_path,O_RDONLY);
+	if(m_server_mq==-1) printf("m_server_mq %s m_server.c\n",strerror(errno));
 
+	printf("M_server %d %d\n",client_mq,m_server_mq);
+	
 	root = (dir *)malloc(sizeof(dir));
 	root->num_subdir = 0;
 
-	struct command* recieved_command = (struct command*)malloc(sizeof(struct command));
+	struct command* recieved_command;
 	while (1)
 	{
 		sem_wait(s_m_server);
-		msgrcv(m_server_mq, recieved_command, sizeof(struct command), 1, 0);
+		if(mq_receive(m_server_mq,buffer,BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
+		recieved_command = (struct command*)buffer;
 		handle_command(*recieved_command);
 	}
 	return 0;
@@ -152,23 +160,34 @@ void handle_command(struct command recieved_command){
 			struct status stat; stat.type = 1;
 			stat.regarding = 0;
 			stat.status = 1;
-			msgsnd(m_server_mq,&stat,sizeof(struct status),0);
-			
+			//msgsnd(m_server_mq,&stat,sizeof(struct status),0);
+			if(mq_send(client_mq,(const char*)&stat,sizeof(struct status)+1,0)==-1) printf("%s",strerror(errno));
+
+			printf("m_server message sent\n");
 			sem_post(s_client);
-			printf("sem working I guess\n");
+			sem_trywait(s_m_server);
 
-
-			struct add_chunk_request acr; acr.term=0;
+			struct add_chunk_request* acr;
 			struct chunk_added ca; ca.type = 2; ca.chunk_id = 3;
 			int count = 3;
 			do{
-				msgrcv(m_server_mq,&acr,sizeof(struct add_chunk_request),2,0);
-				if(acr.term==1) {break;}
+				printf("m_server waiting...\n");
+				sem_wait(s_m_server);
+				printf("m_server wait over!\n");
+
+				if(mq_receive(m_server_mq,buffer,BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
+				acr = (struct add_chunk_request*) buffer;
+				if((*acr).term==1) {break;}
 				ca.chunk_id = count++;;
 				ca.d_servers[0] = count++; ca.d_servers[1] = count++; ca.d_servers[2] = count++;
-				msgsnd(client_mq,&ca,sizeof(struct chunk_added),0);
-				printf("recieved %d\n",acr.chunk_num);
-			}while(acr.term!=1);
+				if(mq_send(client_mq,(const char*)&ca, sizeof(struct chunk_added)+1,0)==-1) printf("%s\n",strerror(errno));
+
+				sem_post(s_client);
+				sem_trywait(s_d_server);
+
+				printf("recieved %d\n",(*acr).chunk_num);
+			} while((*acr).term!=1);
+			printf("command terminated \n");
 			return;
 	}
 }

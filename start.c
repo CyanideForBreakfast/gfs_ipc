@@ -9,15 +9,25 @@
 #include <semaphore.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <mqueue.h>
+#include <errno.h>
 
 #define SEM_NAME_CLIENT "CLIENT"
 #define SEM_NAME_M_SERVER "M_SERVER"
 #define SEM_NAME_D_SERVER "D_SERVER"
 
 int m_server_mq, client_mq, d_server_mq;
+char client_path[] = "/client.c"; char m_server_path[] = "/m_server.c"; char d_server_path[] = "/d_server.c";
+	
 void close_prog(int);
 void close_prog(int sig){
 	printf("\nClosing program ....\n");
+	mq_unlink(client_path);
+	mq_unlink(m_server_path);
+	mq_unlink(d_server_path);
+	mq_close(m_server_mq);
+	mq_close(client_mq);
+	mq_close(d_server_mq);
 	system("ipcrm --all");
 }
 
@@ -31,11 +41,10 @@ int main(){
 	sem_t* s_m_server = sem_open(SEM_NAME_M_SERVER,O_CREAT | O_EXCL,S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,0);
 	sem_t* s_d_server = sem_open(SEM_NAME_D_SERVER,O_CREAT | O_EXCL,S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,0);
 
-
 	// making sure client.c, m_server.c and d_server.c are compiled with appropriate names
-	system("gcc -o client client.c");
-	system("gcc -o m_server m_server.c");
-	system("gcc -o d_server d_server.c");
+	system("gcc -o client client.c -lpthread -lrt");
+	system("gcc -o m_server m_server.c -lpthread -lrt");
+	system("gcc -o d_server d_server.c -lpthread -lrt");
 
 	printf("Starting servers .......\n");
 	
@@ -44,9 +53,23 @@ int main(){
 	 * there will two message queues
 	 * 1. between client and m_server
 	 * 2. between client and d_servers*/
-	int m_server_mq = msgget(ftok("./m_server.c",99),0666|IPC_CREAT);
-	int d_server_mq = msgget(ftok("./d_server.c",99),0666|IPC_CREAT);
-	int client_mq = msgget(ftok("./client.c",99),0666|IPC_CREAT);
+
+	struct mq_attr attr;
+
+    attr.mq_flags = 0;
+    attr.mq_maxmsg = 10;
+    attr.mq_msgsize = 100;
+    attr.mq_curmsgs = 0;
+
+	char client_path[] = "/client.c"; char m_server_path[] = "/m_server.c"; char d_server_path[] = "/d_server.c";
+	mqd_t client_mq = mq_open(client_path,O_CREAT | O_RDWR,0666,&attr);
+	if(client_mq==-1) printf("client_mq %s start.c\n",strerror(errno));
+	mqd_t m_server_mq = mq_open(m_server_path,O_CREAT| O_RDWR,0644,&attr);
+	if(m_server_mq==-1) printf("m_server_mq %s start.c\n",strerror(errno));
+	mqd_t d_server_mq = mq_open(d_server_path,O_CREAT | O_RDWR,0644,&attr);
+	if(d_server_mq==-1) printf("d_server_mq %s start.c\n",strerror(errno));
+
+
 	//start m_server
 	char* m_file[] = {"./m_server",NULL};
 	pid_t pid = fork();	

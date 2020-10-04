@@ -8,6 +8,8 @@
 #include <semaphore.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <mqueue.h>
+#include <errno.h>
 
 /*
  ****WARNING****
@@ -26,15 +28,17 @@
 #define SEM_NAME_M_SERVER "M_SERVER"
 #define SEM_NAME_D_SERVER "D_SERVER"
 
+char buffer[BUFFER_SIZE];
+
 sem_t *s_client;
 sem_t *s_m_server;
 sem_t *s_d_server;
 
 /* message queue ids for m_server and d_server
  * */
-int m_server_mq;
-int d_server_mq;
-int client_mq;
+mqd_t m_server_mq;
+mqd_t d_server_mq;
+mqd_t client_mq;
 
 struct addf
 {
@@ -88,11 +92,15 @@ int main()
 	s_d_server = sem_open(SEM_NAME_D_SERVER, O_RDWR);
 
 	//setting mq_ids for m_server and d_server
-	m_server_mq = msgget(ftok("./m_server.c", 99), 0666 | IPC_CREAT);
-	d_server_mq = msgget(ftok("./d_server.c", 99), 0);
-	client_mq = msgget(ftok("./client.c",99),0666|IPC_CREAT);
+	char client_path[] = "/client.c"; char m_server_path[] = "/m_server.c"; char d_server_path[] = "/d_server.c";
+	client_mq = mq_open(client_path,O_RDONLY);
+	if(client_mq==-1) printf("client_mq %s client.c\n",strerror(errno));
+	m_server_mq = mq_open(m_server_path,O_WRONLY);
+	if(m_server_mq==-1) printf("m_server_mq %s client.c\n",strerror(errno));
 
-	printf("client M_SERVER %d D_SERVER %d\n", m_server_mq, d_server_mq);
+	printf("Client %d %d\n",client_mq,m_server_mq);
+
+	//printf("client M_SERVER %d D_SERVER %d\n", m_server_mq, d_server_mq);
 	printf("addf(src,chunk_size,dest),rm(src),cp(src,dest),mv(src,dest)\n");
 	//testing
 	/*
@@ -332,16 +340,20 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			strcpy(msg.dest, m->a.m_server_path);
 			msg.chunk_size = m->a.chunk_size;
 			//send to add file to hierarchy
-			msgsnd(m_server_mq, &msg, sizeof(struct command), 0);
+			if(mq_send(m_server_mq,(const char*)&msg,sizeof(struct command)+1,0)==-1) printf("%s\n",strerror(errno));
 
 			sem_post(s_m_server);
 			sem_trywait(s_client);
+			printf("client waiting ....\n");
 			sem_wait(s_client);
+			printf("client wait over!\n");
 
 			//wait for status
-			struct status stat;
-			msgrcv(m_server_mq, &stat, sizeof(struct status), 1, 0);
-			if (stat.status)
+			struct status* stat;
+			if(mq_receive(client_mq, buffer, BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
+			stat = (struct status*)buffer;
+
+			if ((*stat).status)
 				printf("addf status confirmed by client\n");
 
 			/* in each iteration,
@@ -352,7 +364,7 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 				*/	
 			FILE* fptr = fopen(m->a.local_path,"r");
 			struct add_chunk_request acr; acr.type = 2;
-			struct chunk_added ca;
+			struct chunk_added* ca;
 			struct actual_chunk c;
 			c.chunk_num=0;
 			acr.term=0;
@@ -360,16 +372,21 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			while(fptr!=NULL){
 				fptr = next_chunk(fptr,&c,m->a.chunk_size);
 				acr.chunk_num = chunk_num++;
-				if(c.chunk_num==-1 || fptr==NULL) {
-					break;
-				}
+
 				strcpy(acr.file_path,m->a.m_server_path);
-				msgsnd(m_server_mq,&acr,sizeof(struct add_chunk_request),0);
-				msgrcv(client_mq,&ca,sizeof(struct chunk_added),2,0);
-				printf("recieved id : %ld for chunk %d , %d %d %d\n",ca.chunk_id, chunk_num, ca.d_servers[0],ca.d_servers[1],ca.d_servers[2]);
+
+				if(mq_send(m_server_mq,(const char*)&acr,sizeof(struct add_chunk_request)+1,0)==-1) printf("%s",strerror(errno));
+
+				sem_post(s_m_server);
+				sem_trywait(s_client);
+				sem_wait(s_client);
+
+				if(mq_receive(client_mq,buffer,BUFFER_SIZE,NULL)==-11) printf("%s",strerror(errno));
+				ca = (struct chunk_added*)buffer;
+				printf("recieved id : %ld for chunk %d , %d %d %d\n",(*ca).chunk_id, chunk_num, (*ca).d_servers[0],(*ca).d_servers[1],(*ca).d_servers[2]);
 			};
 			acr.term=1;
-			msgsnd(m_server_mq,&acr,sizeof(struct add_chunk_request),0); //send chunking terminated message
+			if(mq_send(m_server_mq,(const char*)&acr,sizeof(struct add_chunk_request)+1,0)==-1) printf("%s",strerror(errno)); //send chunking terminated message
 			break;
 	}
 }
