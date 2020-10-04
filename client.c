@@ -11,6 +11,7 @@
 #include <mqueue.h>
 #include <errno.h>
 #include <sys/mman.h>
+#include <signal.h>
 
 /*
  ****WARNING****
@@ -23,7 +24,7 @@
 #define PATH_SIZE 20
 #define NUM_SUBDIRS 10
 #define NUM_FILES 10
-#define MAX_CHUNK_SIZE 500
+#define MAX_CHUNK_SIZE 30
 #define MAX_D_SERVERS 50
 
 #define SEM_NAME_CLIENT "CLIENT"
@@ -113,6 +114,8 @@ int main(int argc, char* argv[])
 	if(client_mq==-1) printf("client_mq %s client.c\n",strerror(errno));
 	m_server_mq = mq_open(m_server_path,O_WRONLY);
 	if(m_server_mq==-1) printf("m_server_mq %s client.c\n",strerror(errno));
+	d_server_mq = mq_open(d_server_path,O_WRONLY);
+	if(d_server_mq==-1) printf("d_server_mq %s client.c\n",strerror(errno));
 
 	printf("Client %d %d\n",client_mq,m_server_mq);
 
@@ -398,10 +401,27 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 				sem_wait(s_client);
 
 				//recieve d_server_ids to store the data
-				if(mq_receive(client_mq,buffer,BUFFER_SIZE,NULL)==-11) printf("%s",strerror(errno));
+				if(mq_receive(client_mq,buffer,BUFFER_SIZE,NULL)==-11) printf("%s\n",strerror(errno));
 				ca = (struct chunk_added*)buffer;
 				printf("recieved id : %ld for chunk %d , %d %d %d\n",(*ca).chunk_id, chunk_num, (*ca).d_servers[0],(*ca).d_servers[1],(*ca).d_servers[2]);
 
+				/*
+				 * send chunk to the d_servers
+				 * first send signal to wake up the specific d_server
+				 * sent chunk subsequently
+				 * store there
+				 * get success message
+				 * use semaphores appropriately
+				*/
+				for(int i=0;i<3;i++){
+					kill(d_servers_pids_array[(*ca).d_servers[i]],SIGUSR1);
+
+					//send chunk
+					if(mq_send(d_server_mq,(const char*)&c,sizeof(struct actual_chunk)+1,0)==-1) printf("%s\n",strerror(errno));
+					sem_trywait(s_client);
+					sem_post(s_d_server);
+					sem_wait(s_client);
+				}
 
 			};
 			acr.term=1;

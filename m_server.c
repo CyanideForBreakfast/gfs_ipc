@@ -18,7 +18,7 @@
 #define PATH_SIZE 20
 #define NUM_SUBDIRS 10
 #define NUM_FILES 10
-#define MAX_CHUNK_SIZE 500
+#define MAX_CHUNK_SIZE 30
 #define DEF_NUM_CHUNK 30 //represents the increment of filling up of chunks in file
 #define MAX_D_SERVERS 50
 
@@ -36,6 +36,7 @@ sem_t *s_d_server;
 
 mqd_t m_server_mq;
 mqd_t client_mq;
+mqd_t d_server_mq;
 
 /* store unused chunk ids here
  * when assigning chunk ids make sure num_unused_chunk_ids is 0
@@ -161,7 +162,9 @@ int main(int argc,char* argv[])
 	if(client_mq==-1) printf("client_mq %s m_server.c\n",strerror(errno));
 	m_server_mq = mq_open(m_server_path,O_RDONLY);
 	if(m_server_mq==-1) printf("m_server_mq %s m_server.c\n",strerror(errno));
-
+	d_server_mq = mq_open(d_server_path,O_WRONLY);
+	if(d_server_mq==-1) printf("d_server_mq %s client.c\n",strerror(errno));
+	
 	printf("M_server %d %d\n",client_mq,m_server_mq);
 	
 	root = (dir *)malloc(sizeof(dir));
