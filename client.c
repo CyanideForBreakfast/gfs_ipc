@@ -460,7 +460,7 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			sem_post(s_m_server);
 			sem_trywait(s_client);
 			sem_wait(s_client);
-			print("Removed");
+			printf("Removed");
 			break;
 
 		case 2:
