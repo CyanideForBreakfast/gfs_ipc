@@ -387,6 +387,11 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			};
 			acr.term=1;
 			if(mq_send(m_server_mq,(const char*)&acr,sizeof(struct add_chunk_request)+1,0)==-1) printf("%s",strerror(errno)); //send chunking terminated message
+			
+			sem_post(s_m_server);
+			sem_trywait(s_client);
+			sem_wait(s_client);
+			
 			break;
 	}
 }

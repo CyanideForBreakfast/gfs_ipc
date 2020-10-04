@@ -45,7 +45,8 @@ long int unused_chunk_ids[1000];
 typedef struct file
 {
 	char name[FILE_DIR_NAME_SIZE];
-	int chunks[][3];
+	int chunk_num;
+	int* chunks;
 } file;
 
 typedef struct dir
@@ -188,6 +189,9 @@ void handle_command(struct command recieved_command){
 				printf("recieved %d\n",(*acr).chunk_num);
 			} while((*acr).term!=1);
 			printf("command terminated \n");
+
+			sem_trywait(s_m_server);
+			sem_post(s_client);
 			return;
 	}
 }
