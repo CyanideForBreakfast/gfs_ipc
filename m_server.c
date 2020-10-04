@@ -11,6 +11,7 @@
 #include <mqueue.h>
 #include <errno.h>
 #include <sys/mman.h>
+#include <signal.h>
 
 #define NAME_SIZE 20
 #define BUFFER_SIZE 200
@@ -139,6 +140,14 @@ struct chunk_stored
 {
 	long int type;
 	int status;
+};
+
+//for m_server to d_server communication
+//status will be sent back to m_server using the status struct
+struct do_on_chunk{
+	int action; //0 for rm and 1 for cp
+	long int old_chunk_id;
+	long int new_chunk_id;
 };
 
 void handle_command(struct command);
@@ -274,6 +283,44 @@ void handle_command(struct command recieved_command){
 			sem_trywait(s_m_server);
 			sem_post(s_client);
 			return;
+		case 1:
+			//rm file
+			/*
+			 * for each chunk of file
+			 * signal each of d_server
+			 * send mq to each of 3 d_server to remove file
+			 * add the removed chunk_ids to unused_chunk_id array
+			 * decrement file_num;
+			*/
+			;
+			file* to_rm_file = find_location(recieved_command.src);
+
+			//for each chunk
+			for(int i=0;i<to_rm_file->chunk_num;i++){
+				for(int j=0;j<3;j++){
+					//signal the d_server
+					kill(d_servers_pids_array[to_rm_file->chunks[i].d_servers[j]],SIGUSR2);
+
+					//setting the chunk to be removed
+					struct do_on_chunk doc;
+					doc.action = 0;
+					doc.old_chunk_id = to_rm_file->chunks[i].chunk_id;
+					doc.new_chunk_id = to_rm_file->chunks[i].chunk_id;
+					if(mq_send(d_server_mq,(const char*)&doc,sizeof(struct do_on_chunk)+1,0)==-1) printf("%s\n",strerror(errno));
+				
+					sem_trywait(s_m_server);
+					sem_post(s_d_server);
+					sem_wait(s_m_server);
+				}
+				//printf("end here\n");
+			}
+			//remove decrement parent's file_num and hence remove file
+			((dir*)(to_rm_file->par))->num_files--;
+
+			sem_trywait(s_m_server);
+			sem_post(s_client);
+			return;
+
 		case 2:
 			//mv
 

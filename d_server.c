@@ -89,6 +89,21 @@ typedef struct d_server_command
 	char *args;
 } d_server_command;
 
+//for m_server to d_server communication
+//status will be sent back to m_server using the status struct
+struct do_on_chunk{
+	int action; //0 for rm and 1 for cp
+	long int old_chunk_id;
+	long int new_chunk_id;
+};
+
+struct status
+{
+	long int type;
+	int regarding;
+	int status;
+};
+
 void handler(int signum){
 	//wait for semaphore release
 	sem_wait(s_d_server);
@@ -119,6 +134,19 @@ void handler(int signum){
 	}
 	if(signum == SIGUSR2){
 		printf("Someone called me %d sigusr2\n",getpid());
+		
+		struct do_on_chunk* doc;
+		if(mq_receive(d_server_mq,buffer,BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
+
+		doc = (struct do_on_chunk*)buffer;
+		if(doc->action==0){
+			printf("removing now\n");
+		}
+
+		sem_trywait(s_d_server);
+		sem_post(s_m_server);
+		return;
+
 	}
 	if(signum == SIGQUIT){
 		//recieve and execute command

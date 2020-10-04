@@ -445,6 +445,23 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			sem_wait(s_client);
 			
 			break;
+		case 1:
+			//rm
+			/*
+			 src and dest both refer to the same file that is to be deleted
+			*/
+			msg.command_type = 1;
+			strcpy(msg.src,m->r.m_server_path);
+			strcpy(msg.dest,m->r.m_server_path);
+
+			//send message to remove file
+			if(mq_send(m_server_mq,(const char*)&msg,sizeof(struct command)+1,0)==-1) printf("%s\n",strerror(errno));
+
+			sem_post(s_m_server);
+			sem_trywait(s_client);
+			sem_wait(s_client);
+			break;
+
 		case 2:
 			//mv
 			
