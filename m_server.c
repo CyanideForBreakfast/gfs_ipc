@@ -142,6 +142,7 @@ struct chunk_stored
 
 void handle_command(struct command);
 file* find_location(char*);
+void print_hierarchy(dir*);
 int main(int argc,char* argv[])
 {
 	//read and store pids from shared memory
@@ -169,6 +170,7 @@ int main(int argc,char* argv[])
 	
 	root = (dir *)malloc(sizeof(dir));
 	root->num_subdir = 0;
+	strcat(root->name,"/");
 
 	struct command* recieved_command;
 	while (1)
@@ -186,8 +188,16 @@ void handle_command(struct command recieved_command){
 		case 0:
 			//addf
 			
-			//find file location and add file properly
+			//add file
+			;
+			file* f = find_location(recieved_command.dest);
+			f->chunk_num=0;
+			f->chunk_capacity=DEF_NUM_CHUNK;
+			f->chunks = (chunk*)malloc(DEF_NUM_CHUNK*sizeof(chunk));
+
 			printf("%s added to %s successfully\n",recieved_command.src,recieved_command.dest);
+
+			print_hierarchy(root);
 
 			//send status
 			struct status stat; stat.type = 1;
@@ -195,16 +205,16 @@ void handle_command(struct command recieved_command){
 			stat.status = 1;
 			if(mq_send(client_mq,(const char*)&stat,sizeof(struct status)+1,0)==-1) printf("%s",strerror(errno));
 
-			printf("m_server message sent\n");
+			//printf("m_server message sent\n");
 			sem_post(s_client);
 			sem_trywait(s_m_server);
 
 			struct add_chunk_request* acr;
 			struct chunk_added ca; ca.type = 2;
 			do{
-				printf("m_server waiting...\n");
+				//printf("m_server waiting...\n");
 				sem_wait(s_m_server);
-				printf("m_server wait over!\n");
+				//printf("m_server wait over!\n");
 
 				//recieve add_chunk_request
 				if(mq_receive(m_server_mq,buffer,BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
@@ -228,13 +238,15 @@ void handle_command(struct command recieved_command){
 				d_server_id_seed = d_server_id_seed%num_d_servers;
 				
 				//update file hierarchy
-				file* f = find_location(acr->file_path);
+				f = find_location(acr->file_path);
 				//if first chunk, init
+				/*
 				if(acr->chunk_num==0){
 					f->chunks = (chunk*)malloc(DEF_NUM_CHUNK*sizeof(chunk));
 					f->chunk_capacity = DEF_NUM_CHUNK;
 					f->chunk_num = 0;
 				}
+				*/
 				//check if capacity filled, if it is then realloc
 				if(f->chunk_num>=f->chunk_capacity-1){
 					f->chunks = realloc(f->chunks,f->chunk_capacity+DEF_NUM_CHUNK);
@@ -253,7 +265,7 @@ void handle_command(struct command recieved_command){
 				sem_post(s_client);
 				sem_trywait(s_d_server);
 
-				printf("recieved %d\n",(*acr).chunk_num);
+				//printf("recieved %d\n",(*acr).chunk_num);
 			} while((*acr).term!=1);
 			printf("command terminated \n");
 
@@ -322,5 +334,21 @@ file *find_location(char *path)
 	// printf("file location established\n");
 
 	return &present_dir->files[present_dir->num_files++];
+}
 
+void print_hierarchy(dir* d){
+	//takes input as directory and prints hierarchy
+	printf("%s:\n",d->name);
+	printf("dirs: ");
+	for(int i=0;i<d->num_subdir;i++){
+		printf("%s ",d->subdirs[i]->name);
+	}
+	printf("\nfiles: ");
+	for(int i=0;i<d->num_files;i++){
+		printf("%s ",d->files[i].name);
+	}
+	printf("\n---------------\n");
+	for(int i=0;i<d->num_subdir;i++){
+		print_hierarchy(d->subdirs[i]);
+	}
 }

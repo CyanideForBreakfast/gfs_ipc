@@ -403,7 +403,7 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 				//recieve d_server_ids to store the data
 				if(mq_receive(client_mq,buffer,BUFFER_SIZE,NULL)==-11) printf("%s\n",strerror(errno));
 				ca = (struct chunk_added*)buffer;
-				printf("recieved id : %ld for chunk %d , %d %d %d\n",(*ca).chunk_id, chunk_num, (*ca).d_servers[0],(*ca).d_servers[1],(*ca).d_servers[2]);
+				//printf("recieved id : %ld for chunk %d , %d %d %d\n",(*ca).chunk_id, chunk_num, (*ca).d_servers[0],(*ca).d_servers[1],(*ca).d_servers[2]);
 				c.chunk_id = (*ca).chunk_id;
 				/*
 				 * send chunk to the d_servers
@@ -437,6 +437,10 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			sem_wait(s_client);
 			
 			break;
+		case 2:
+			msg.command_type = 2;
+			strcpy(msg.src,m->m.m_server_src);
+			strcpy(msg.dest,m->m.m_server_dest);
 	}
 }
 /*
