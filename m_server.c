@@ -18,6 +18,7 @@
 #define NUM_SUBDIRS 10
 #define NUM_FILES 10
 #define MAX_CHUNK_SIZE 500
+#define DEF_NUM_CHUNK 30 //represents the increment of filling up of chunks in file
 
 #define SEM_NAME_CLIENT "CLIENT"
 #define SEM_NAME_M_SERVER "M_SERVER"
@@ -38,15 +39,29 @@ mqd_t client_mq;
  */
 int num_unused_chunk_ids = 0;
 long int unused_chunk_ids[1000];
+long int max_chunk_id = 0;
+
+/* will be used to assign d_server_ids
+	d_servers returned will be seed, seed+1,seed+2 (ensuring uniform distribution amongst d_servers)
+*/
+int d_server_id_seed = 0;
+int num_d_servers; //number of d_servers - to be passed from start.c
 
 /* details given in digram
  * chunks stores d_server_id of d_servers storing the chunk
 */
+typedef struct chunk{
+	int chunk_num;
+	long int chunk_id;
+	int d_servers[3];
+} chunk;
+
 typedef struct file
 {
 	char name[FILE_DIR_NAME_SIZE];
 	int chunk_num;
-	int* chunks;
+	chunk* chunks;
+	int chunk_capacity;
 } file;
 
 typedef struct dir
@@ -121,8 +136,12 @@ struct chunk_stored
 };
 
 void handle_command(struct command);
-int main()
+file* find_location(char*);
+int main(int argc,char* argv[])
 {
+	num_d_servers = atoi(argv[1]);
+	printf("Number of servers: %d\n",num_d_servers);
+	
 	s_client = sem_open(SEM_NAME_CLIENT, O_RDWR);
 	s_m_server = sem_open(SEM_NAME_M_SERVER, O_RDWR);
 	s_d_server = sem_open(SEM_NAME_D_SERVER, O_RDWR);
@@ -161,7 +180,6 @@ void handle_command(struct command recieved_command){
 			struct status stat; stat.type = 1;
 			stat.regarding = 0;
 			stat.status = 1;
-			//msgsnd(m_server_mq,&stat,sizeof(struct status),0);
 			if(mq_send(client_mq,(const char*)&stat,sizeof(struct status)+1,0)==-1) printf("%s",strerror(errno));
 
 			printf("m_server message sent\n");
@@ -169,18 +187,54 @@ void handle_command(struct command recieved_command){
 			sem_trywait(s_m_server);
 
 			struct add_chunk_request* acr;
-			struct chunk_added ca; ca.type = 2; ca.chunk_id = 3;
-			int count = 3;
+			struct chunk_added ca; ca.type = 2;
 			do{
 				printf("m_server waiting...\n");
 				sem_wait(s_m_server);
 				printf("m_server wait over!\n");
 
+				//recieve add_chunk_request
 				if(mq_receive(m_server_mq,buffer,BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
 				acr = (struct add_chunk_request*) buffer;
 				if((*acr).term==1) {break;}
-				ca.chunk_id = count++;;
-				ca.d_servers[0] = count++; ca.d_servers[1] = count++; ca.d_servers[2] = count++;
+
+				/*
+				 * Decide chunk_id
+				 * Decide d_server_ids to return
+				 * Update file hierarchy
+				 * Return the values
+				*/
+				//decide chunk_id
+				long int assigned_chunk_id;
+				if(num_unused_chunk_ids==0) assigned_chunk_id=unused_chunk_ids[--num_unused_chunk_ids];
+				else assigned_chunk_id = max_chunk_id++;
+				ca.chunk_id = assigned_chunk_id;
+				
+				//decide d_servers
+				ca.d_servers[0] = (d_server_id_seed++)%num_d_servers; ca.d_servers[1] = (d_server_id_seed++)%num_d_servers; ca.d_servers[2] = (d_server_id_seed++)%num_d_servers;
+				d_server_id_seed = d_server_id_seed%num_d_servers;
+				
+				//update file hierarchy
+				file* f = find_location(acr->file_path);
+				//if first chunk, init
+				if(acr->chunk_num==0){
+					f->chunks = (chunk*)malloc(DEF_NUM_CHUNK*sizeof(chunk));
+					f->chunk_capacity = DEF_NUM_CHUNK;
+					f->chunk_num = 0;
+				}
+				//check if capacity filled, if it is then realloc
+				if(f->chunk_num>=f->chunk_capacity-1){
+					f->chunks = realloc(f->chunks,f->chunk_capacity+DEF_NUM_CHUNK);
+					f->chunk_capacity+=DEF_NUM_CHUNK;
+				}
+				//put chunk
+				f->chunks[f->chunk_num].chunk_id = assigned_chunk_id;
+				f->chunks[f->chunk_num].d_servers[0] = ca.d_servers[0];
+				f->chunks[f->chunk_num].d_servers[1] = ca.d_servers[1];
+				f->chunks[f->chunk_num].d_servers[2] = ca.d_servers[2];
+				f->chunk_num++;
+
+				//send values
 				if(mq_send(client_mq,(const char*)&ca, sizeof(struct chunk_added)+1,0)==-1) printf("%s\n",strerror(errno));
 
 				sem_post(s_client);
@@ -202,5 +256,58 @@ void handle_command(struct command recieved_command){
  * */
 file *find_location(char *path)
 {
+	int dir_depth = 0;
+	char temp_path[strlen(path) + 1];
+	strcpy(temp_path, path);
+
+	for (char *i = path + 1; *i != '\0'; i++)
+	{
+		if (*i == '/')
+		{
+			dir_depth++;
+		}
+	}
+
+	dir *present_dir = root;	//	iterates starting from root
+	char *itr = strtok(temp_path, "/");
+	for (int i = 0; i < dir_depth; i++, itr = strtok(NULL, "/"))
+	{
+		short dir_found = 0;
+		for (int j = 0; j < present_dir->num_subdir; j++)
+		{
+			if (strcmp(itr, present_dir->subdirs[j]->name) == 0)
+			{
+				present_dir = present_dir->subdirs[j];
+				dir_found = 1;
+				break;
+			}
+		}
+
+		if (!dir_found)	//	Make new directory with pointer at subdirs[index]
+		{
+			int index = present_dir->num_subdir;
+			present_dir->subdirs = (dir **)realloc(present_dir->subdirs, ++present_dir->num_subdir * sizeof(dir *));
+			
+			present_dir->subdirs[index] = (dir *)malloc(sizeof(dir));
+			strcpy(present_dir->subdirs[index]->name, itr);
+			present_dir->subdirs[index]->num_files = 0;
+			present_dir->subdirs[index]->num_subdir = 0;
+			present_dir = present_dir->subdirs[index];
+		}
+	}
+
+	for (int i = 0; i < present_dir->num_files; i++)
+	{
+		if (strcmp(present_dir->files[i].name, itr) == 0)
+		{
+			return &present_dir->files[i];
+		}
+	}
+
+	// File does not exit
+	strcpy(present_dir->files[present_dir->num_files].name, itr);
+	// printf("file location established\n");
+
+	return &present_dir->files[present_dir->num_files++];
 
 }

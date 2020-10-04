@@ -71,7 +71,9 @@ int main(){
 
 
 	//start m_server
-	char* m_file[] = {"./m_server",NULL};
+	char arg_for_m[10];
+	sprintf(arg_for_m,"%d",num_d_servers);
+	char* m_file[] = {"./m_server",arg_for_m,NULL};
 	pid_t pid = fork();	
 	if(pid==0) {printf("M_SERVER PID %d\n",getpid());execv("./m_server",m_file);}
 
