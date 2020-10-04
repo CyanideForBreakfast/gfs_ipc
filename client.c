@@ -483,8 +483,21 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 
 			if ((*stat).status)	printf("Moved successfully!\n");
 			break;
+		
+		case 3:
+			//cp
+			/*
+			 * file will be copied from src to dest
+			 * 
+			*/
+			msg.command_type = 3;
+			strcpy(msg.src,m->c.m_server_src);
+			strcpy(msg.dest,m->c.m_server_dest);
+			if(mq_send(m_server_mq,(const char*)&msg,sizeof(struct command)+1,0)==-1) printf("%s\n",strerror(errno));
 
-
+			sem_trywait(s_client);
+			sem_post(s_m_server);
+			sem_wait(s_client);
 	}
 }
 /*

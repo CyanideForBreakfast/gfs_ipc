@@ -140,7 +140,9 @@ void handler(int signum){
 
 		doc = (struct do_on_chunk*)buffer;
 		if(doc->action==0){
-			printf("removing now\n");
+			char file_path[10];
+			sprintf(file_path, "rm %d/%ld",d_server_id,doc->old_chunk_id);
+			system(file_path);
 		}
 
 		sem_trywait(s_d_server);

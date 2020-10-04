@@ -348,6 +348,22 @@ void handle_command(struct command recieved_command){
 			sem_trywait(s_m_server);
 			sem_post(s_client);
 			return;
+
+		case 3:
+			//cp
+
+			/*
+			 * 
+			*/
+			;
+			file* from= find_location(recieved_command.src);
+			file* to = find_location(recieved_command.dest);
+
+			for(int i=0;i<from->chunk_num;i++){
+				
+			}
+
+			return;
 		
 
 	}
