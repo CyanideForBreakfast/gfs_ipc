@@ -67,6 +67,7 @@ typedef struct file
 	int chunk_num;
 	chunk* chunks;
 	int chunk_capacity;
+	void* par;
 } file;
 
 typedef struct dir
@@ -184,6 +185,7 @@ int main(int argc,char* argv[])
 }
 
 void handle_command(struct command recieved_command){
+	struct status stat;
 	switch(recieved_command.command_type){
 		case 0:
 			//addf
@@ -200,7 +202,7 @@ void handle_command(struct command recieved_command){
 			print_hierarchy(root);
 
 			//send status
-			struct status stat; stat.type = 1;
+			stat.type = 1;
 			stat.regarding = 0;
 			stat.status = 1;
 			if(mq_send(client_mq,(const char*)&stat,sizeof(struct status)+1,0)==-1) printf("%s",strerror(errno));
@@ -272,6 +274,32 @@ void handle_command(struct command recieved_command){
 			sem_trywait(s_m_server);
 			sem_post(s_client);
 			return;
+		case 2:
+			//mv
+
+			;
+			//move file from src to dest
+			file* dest_file = find_location(recieved_command.dest);
+			file* src_file = find_location(recieved_command.src);
+
+			printf("before moving: \n");
+			//print_hierarchy(root);
+			
+			((dir*)(src_file->par))->num_files--;
+			//*dest_file = *src_file;
+			//*src_file = ((dir*)(src_file->par))->files[((dir*)(src_file->par))->num_files];
+
+			//send status
+			stat.regarding = 0;
+			stat.status = 1;
+			printf("sending\n");
+			if(mq_send(client_mq,(const char*)&stat,sizeof(struct status)+1,0)==-1) printf("%s\n",strerror(errno));
+
+			printf("after moving: \n");
+			print_hierarchy(root);
+			sem_trywait(s_m_server);
+			sem_post(s_client);
+			return;
 	}
 }
 
@@ -333,17 +361,18 @@ file *find_location(char *path)
 	strcpy(present_dir->files[present_dir->num_files].name, itr);
 	// printf("file location established\n");
 
+	present_dir->files[present_dir->num_files+1].par = (void*)present_dir;
 	return &present_dir->files[present_dir->num_files++];
 }
 
 void print_hierarchy(dir* d){
 	//takes input as directory and prints hierarchy
 	printf("%s:\n",d->name);
-	printf("dirs: ");
+	printf("%d dirs: ",d->num_subdir);
 	for(int i=0;i<d->num_subdir;i++){
 		printf("%s ",d->subdirs[i]->name);
 	}
-	printf("\nfiles: ");
+	printf("\n%d files: ",d->num_files);
 	for(int i=0;i<d->num_files;i++){
 		printf("%s ",d->files[i].name);
 	}
