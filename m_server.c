@@ -260,7 +260,7 @@ void handle_command(struct command recieved_command){
 				*/
 				//check if capacity filled, if it is then realloc
 				if(f->chunk_num>=f->chunk_capacity-1){
-					f->chunks = realloc(f->chunks,f->chunk_capacity+DEF_NUM_CHUNK);
+					f->chunks = realloc(f->chunks,(size_t)(f->chunk_capacity+DEF_NUM_CHUNK));
 					f->chunk_capacity+=DEF_NUM_CHUNK;
 				}
 				//put chunk
@@ -306,6 +306,8 @@ void handle_command(struct command recieved_command){
 					doc.action = 0;
 					doc.old_chunk_id = to_rm_file->chunks[i].chunk_id;
 					doc.new_chunk_id = to_rm_file->chunks[i].chunk_id;
+					//setting chunk_id to unused_chunk_ids
+					unused_chunk_ids[num_unused_chunk_ids++] = to_rm_file->chunks[i].chunk_id;
 					if(mq_send(d_server_mq,(const char*)&doc,sizeof(struct do_on_chunk)+1,0)==-1) printf("%s\n",strerror(errno));
 				
 					sem_trywait(s_m_server);

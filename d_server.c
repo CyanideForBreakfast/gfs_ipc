@@ -140,12 +140,12 @@ void handler(int signum){
 
 		doc = (struct do_on_chunk*)buffer;
 		if(doc->action==0){
-			char file_path[10];
-			sprintf(file_path, "rm %d/%ld",d_server_id,doc->old_chunk_id);
+			char file_path[50];
+			sprintf(file_path, "rm %d/%ld 2>/dev/null",d_server_id,doc->old_chunk_id);
 			system(file_path);
 		}
 		if(doc->action==1){
-			char file_path[100];
+			char file_path[50];
 			sprintf(file_path, "cp %d/%ld %d/%ld",d_server_id,doc->old_chunk_id,d_server_id,doc->new_chunk_id);
 			system(file_path);
 			//printf("copied\n");
