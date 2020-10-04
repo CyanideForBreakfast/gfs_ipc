@@ -20,6 +20,7 @@
 #define SEM_NAME_D_SERVER "D_SERVER"
 #define SHARED_MEMORY_PIDS_NAME "D_SERVERS_PIDS"
 
+int num_d_servers;
 int m_server_mq, client_mq, d_server_mq;
 char client_path[] = "/client.c"; char m_server_path[] = "/m_server.c"; char d_server_path[] = "/d_server.c";
 	
@@ -32,11 +33,16 @@ void close_prog(int sig){
 	mq_close(m_server_mq);
 	mq_close(client_mq);
 	mq_close(d_server_mq);
+	//remove all d_server directories
+	for(int i=0;i<num_d_servers;i++){
+		char temp[10];
+		sprintf(temp,"rm -r %d",i);
+		system(temp);
+	}
 	system("ipcrm --all");
 }
 
 int main(){
-	int num_d_servers;
 	printf("Number of data servers: ");
 	scanf("%d", &num_d_servers);
 

@@ -23,6 +23,7 @@
 int d_server_id; //id of the d_server
 
 char buffer[BUFFER_SIZE];
+char dir_name[10];
 
 sem_t *s_client;
 sem_t *s_m_server;
@@ -36,8 +37,12 @@ mqd_t client_mq;
 
 void handler(int);
 int main(int argc, char* argv[]){
+
 	d_server_id = atoi(argv[1]);
-	d_server_mq = msgget(ftok("./d_server.c",99),0);
+	//create d_server directory
+	struct stat st = {0};
+	strcpy(dir_name,argv[1]);
+	if(stat(dir_name,&st)==-1) mkdir(dir_name,0700);
 
 	//set semaphores
 	s_client = sem_open(SEM_NAME_CLIENT, O_RDWR);
@@ -78,8 +83,15 @@ void handler(int signum){
 		//recieve chunk
 		if(mq_receive(d_server_mq,buffer,BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
 		ac = (struct actual_chunk*)buffer;
-		printf("%s\n",ac->data);
+		//printf("%s\n",ac->data);
 
+		//write chunk to a file with name as chunk_id
+		char file_path[10];
+		sprintf(file_path, "%d/%ld",d_server_id,ac->chunk_id); 
+		FILE* fptr = fopen(file_path,"w+");
+		fwrite((void*)ac->data,1,MAX_CHUNK_SIZE,fptr);
+		fclose(fptr);
+	
 		sem_post(s_client);
 		sem_trywait(s_d_server);
 	}
