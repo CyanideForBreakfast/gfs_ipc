@@ -208,7 +208,7 @@ void handle_command(struct command recieved_command){
 
 			printf("%s added to %s successfully\n",recieved_command.src,recieved_command.dest);
 
-			print_hierarchy(root);
+			//print_hierarchy(root);
 
 			//send status
 			stat.type = 1;
@@ -360,6 +360,8 @@ void handle_command(struct command recieved_command){
 			file* to = find_location(recieved_command.dest);
 
 			to->chunk_num=from->chunk_num;
+			to->chunk_capacity = from->chunk_capacity;
+			to->chunks = (chunk*)malloc((from->chunk_capacity)*sizeof(chunk));
 			struct do_on_chunk doc;
 			for(int i=0;i<from->chunk_num;i++){
 				to->chunks[i] = from->chunks[i];

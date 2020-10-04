@@ -120,7 +120,8 @@ int main(int argc, char* argv[])
 	//printf("Client %d %d\n",client_mq,m_server_mq);
 
 	//printf("client M_SERVER %d D_SERVER %d\n", m_server_mq, d_server_mq);
-	printf("addf(src,chunk_size,dest),rm(src),cp(src,dest),mv(src,dest)\n");
+	printf("Command format:\naddf(src,chunk_size,dest)\nrm(src)\ncp(src,dest)\nmv(src,dest)\nd_server_id command [direct command to d_server]\n");
+	sleep(0.5);
 	//testing
 	/*
 	struct hello_msg{
@@ -380,8 +381,7 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			if(mq_receive(client_mq, buffer, BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
 			stat = (struct status*)buffer;
 
-			if ((*stat).status)
-				printf("addf status confirmed by client\n");
+			if (!((*stat).status)) printf("Unable to add file to M");
 
 			/* in each iteration,
 				* call next_chunk() until -1 chunk_num returned
@@ -494,10 +494,11 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			strcpy(msg.src,m->c.m_server_src);
 			strcpy(msg.dest,m->c.m_server_dest);
 			if(mq_send(m_server_mq,(const char*)&msg,sizeof(struct command)+1,0)==-1) printf("%s\n",strerror(errno));
-
+			//printf("message sent\n");
 			sem_trywait(s_client);
 			sem_post(s_m_server);
 			sem_wait(s_client);
+			printf("Copied.\n");
 			break;
 	}
 }
