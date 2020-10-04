@@ -176,7 +176,7 @@ int main(int argc,char* argv[])
 	d_server_mq = mq_open(d_server_path,O_WRONLY);
 	if(d_server_mq==-1) printf("d_server_mq %s client.c\n",strerror(errno));
 	
-	printf("M_server %d %d\n",client_mq,m_server_mq);
+	//printf("M_server %d %d\n",client_mq,m_server_mq);
 	
 	root = (dir *)malloc(sizeof(dir));
 	root->num_subdir = 0;
@@ -329,8 +329,8 @@ void handle_command(struct command recieved_command){
 			file* dest_file = find_location(recieved_command.dest);
 			file* src_file = find_location(recieved_command.src);
 
-			printf("before moving: \n");
-			print_hierarchy(root);
+			//printf("before moving: \n");
+			//print_hierarchy(root);
 			
 			
 			((dir*)(src_file->par))->num_files--;
@@ -340,11 +340,11 @@ void handle_command(struct command recieved_command){
 			//send status
 			stat.regarding = 0;
 			stat.status = 1;
-			printf("sending\n");
+			//printf("sending\n");
 			if(mq_send(client_mq,(const char*)&stat,sizeof(struct status)+1,0)==-1) printf("%s\n",strerror(errno));
 
-			printf("after moving: \n");
-			print_hierarchy(root);
+			//printf("after moving: \n");
+			//print_hierarchy(root);
 			sem_trywait(s_m_server);
 			sem_post(s_client);
 			return;
@@ -359,10 +359,28 @@ void handle_command(struct command recieved_command){
 			file* from= find_location(recieved_command.src);
 			file* to = find_location(recieved_command.dest);
 
+			to->chunk_num=from->chunk_num;
+			struct do_on_chunk doc;
 			for(int i=0;i<from->chunk_num;i++){
-				
+				to->chunks[i] = from->chunks[i];
+				for(int j=0;j<3;j++){
+					kill(d_servers_pids_array[from->chunks[i].d_servers[j]],SIGUSR2);
+					to->chunks[i].chunk_id = max_chunk_id++;
+					
+					doc.action = 1;
+					doc.old_chunk_id = from->chunks[i].chunk_id;
+					doc.new_chunk_id = to->chunks[i].chunk_id;
+
+					if(mq_send(d_server_mq,(const char*)&doc,sizeof(struct do_on_chunk)+1,0)==-1) printf("%s\n",strerror(errno));
+
+					sem_trywait(s_m_server);
+					sem_post(s_d_server);
+					sem_wait(s_m_server);
+				}
 			}
 
+			sem_trywait(s_m_server);
+			sem_post(s_client);
 			return;
 		
 

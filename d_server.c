@@ -133,7 +133,7 @@ void handler(int signum){
 		return;
 	}
 	if(signum == SIGUSR2){
-		printf("Someone called me %d sigusr2\n",getpid());
+		//printf("Someone called me %d sigusr2\n",getpid());
 		
 		struct do_on_chunk* doc;
 		if(mq_receive(d_server_mq,buffer,BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
@@ -143,6 +143,12 @@ void handler(int signum){
 			char file_path[10];
 			sprintf(file_path, "rm %d/%ld",d_server_id,doc->old_chunk_id);
 			system(file_path);
+		}
+		if(doc->action==1){
+			char file_path[100];
+			sprintf(file_path, "cp %d/%ld %d/%ld",d_server_id,doc->old_chunk_id,d_server_id,doc->new_chunk_id);
+			system(file_path);
+			//printf("copied\n");
 		}
 
 		sem_trywait(s_d_server);

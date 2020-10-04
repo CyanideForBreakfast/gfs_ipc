@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
 	d_server_mq = mq_open(d_server_path,O_WRONLY);
 	if(d_server_mq==-1) printf("d_server_mq %s client.c\n",strerror(errno));
 
-	printf("Client %d %d\n",client_mq,m_server_mq);
+	//printf("Client %d %d\n",client_mq,m_server_mq);
 
 	//printf("client M_SERVER %d D_SERVER %d\n", m_server_mq, d_server_mq);
 	printf("addf(src,chunk_size,dest),rm(src),cp(src,dest),mv(src,dest)\n");
@@ -241,7 +241,7 @@ void parse_and_execute(char *user_command)
 		d_server_command* dcommand = (d_server_command*) malloc(sizeof(d_server_command));
 		dcommand->d_server = d_server_for;
 		strcpy(dcommand->command,strtok(NULL,"\n"));
-		printf("extra command for %d is %s\n",dcommand->d_server,dcommand->command);
+		//printf("extra command for %d is %s\n",dcommand->d_server,dcommand->command);
 		execute_d_server_commands(dcommand);
 		//execute_d_server_commands()
 	}
@@ -498,6 +498,7 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			sem_trywait(s_client);
 			sem_post(s_m_server);
 			sem_wait(s_client);
+			break;
 	}
 }
 /*

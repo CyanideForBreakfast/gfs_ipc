@@ -90,7 +90,7 @@ int main(){
 		char* d_file[] = {"./d_server",num_str,NULL};
 		pid = fork();
 		if(pid==0) execv("./d_server",d_file);
-		printf("start.c pid: %d\n",pid);
+		//printf("start.c pid: %d\n",pid);
 		d_servers_pids[i] = pid;
 	}
 	//open a shared memory for sharing d_servers pids
@@ -105,7 +105,7 @@ int main(){
 	sprintf(arg_for_m,"%d",num_d_servers);
 	char* m_file[] = {"./m_server",arg_for_m,NULL};
 	pid = fork();	
-	if(pid==0) {printf("M_SERVER PID %d\n",getpid());execv("./m_server",m_file);}
+	if(pid==0) {execv("./m_server",m_file);}
 
 	//start client
 	char arg_for_client[10];
