@@ -188,6 +188,8 @@ char *read_command()
  * */
 void parse_and_execute(char *user_command)
 {
+	char copy[50];//copy of user_command
+	strcpy(copy,user_command);
 	m_server_command* m_command_stored = (m_server_command*)malloc(sizeof(m_server_command));
 	m_server_command mcommand = *m_command_stored;
 	char *instruction = (char *)malloc(sizeof(char) * BUFFER_SIZE);
@@ -235,7 +237,12 @@ void parse_and_execute(char *user_command)
 	}
 	else
 	{
-		printf("\nCommand not defined!!\n");
+		int d_server_for = atoi(strtok(copy," "));
+		d_server_command* dcommand = (d_server_command*) malloc(sizeof(d_server_command));
+		dcommand->d_server = d_server_for;
+		strcpy(dcommand->command,strtok(NULL,"\n"));
+		printf("extra command for %d is %s\n",dcommand->d_server,dcommand->command);
+		//execute_d_server_commands()
 	}
 }
 /* function should be triggered when commands are
@@ -457,6 +464,7 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			stat = (struct status*)buffer;
 
 			if ((*stat).status)	printf("Moved successfully!\n");
+			break;
 
 
 	}

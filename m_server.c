@@ -283,12 +283,12 @@ void handle_command(struct command recieved_command){
 			file* src_file = find_location(recieved_command.src);
 
 			printf("before moving: \n");
-			//print_hierarchy(root);
+			print_hierarchy(root);
 			
 			
-			//((dir*)(src_file->par))->num_files--;
-			//*dest_file = *src_file;
-			//if(((dir*)(src_file->par))->num_files!=0) *src_file = ((dir*)(src_file->par))->files[((dir*)(src_file->par))->num_files];
+			((dir*)(src_file->par))->num_files--;
+			*dest_file = *src_file;
+			if(((dir*)(src_file->par))->num_files!=0) *src_file = ((dir*)(src_file->par))->files[((dir*)(src_file->par))->num_files];
 
 			//send status
 			stat.regarding = 0;
@@ -301,6 +301,8 @@ void handle_command(struct command recieved_command){
 			sem_trywait(s_m_server);
 			sem_post(s_client);
 			return;
+		
+
 	}
 }
 
@@ -362,7 +364,7 @@ file *find_location(char *path)
 	strcpy(present_dir->files[present_dir->num_files].name, itr);
 	// printf("file location established\n");
 
-	present_dir->files[present_dir->num_files+1].par = (void*)present_dir;
+	present_dir->files[present_dir->num_files].par = (void*)present_dir;
 	return &present_dir->files[present_dir->num_files++];
 }
 
