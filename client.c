@@ -346,6 +346,7 @@ FILE *next_chunk(FILE *, struct actual_chunk *, int);
 void execute_m_server_commands(m_server_command *m, int command_type)
 {
 	struct command msg; msg.type = 1;
+	struct status* stat;
 	switch (command_type)
 	{
 		case 0:
@@ -368,7 +369,6 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			//printf("client wait over!\n");
 
 			//wait for status
-			struct status* stat;
 			if(mq_receive(client_mq, buffer, BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
 			stat = (struct status*)buffer;
 
@@ -451,6 +451,12 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			sem_trywait(s_client);
 			sem_post(s_m_server);
 			sem_wait(s_client);
+
+			//wait for status
+			if(mq_receive(client_mq, buffer, BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
+			stat = (struct status*)buffer;
+
+			if ((*stat).status)	printf("Moved successfully!\n");
 
 
 	}

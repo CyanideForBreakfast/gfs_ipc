@@ -285,9 +285,10 @@ void handle_command(struct command recieved_command){
 			printf("before moving: \n");
 			//print_hierarchy(root);
 			
-			((dir*)(src_file->par))->num_files--;
+			
+			//((dir*)(src_file->par))->num_files--;
 			//*dest_file = *src_file;
-			//*src_file = ((dir*)(src_file->par))->files[((dir*)(src_file->par))->num_files];
+			//if(((dir*)(src_file->par))->num_files!=0) *src_file = ((dir*)(src_file->par))->files[((dir*)(src_file->par))->num_files];
 
 			//send status
 			stat.regarding = 0;
