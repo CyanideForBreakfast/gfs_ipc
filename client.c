@@ -81,7 +81,7 @@ typedef union m_server_command
 
 typedef struct d_server_command
 {
-	char *command;
+	char command[MAX_CHUNK_SIZE];
 	int d_server;
 	char *args;
 } d_server_command;
@@ -242,6 +242,7 @@ void parse_and_execute(char *user_command)
 		dcommand->d_server = d_server_for;
 		strcpy(dcommand->command,strtok(NULL,"\n"));
 		printf("extra command for %d is %s\n",dcommand->d_server,dcommand->command);
+		execute_d_server_commands(dcommand);
 		//execute_d_server_commands()
 	}
 }
@@ -495,4 +496,11 @@ FILE *next_chunk(FILE *fptr, struct actual_chunk *cptr, int chunk_size)
  * */
 void execute_d_server_commands(d_server_command *d)
 {
+	kill(d_servers_pids_array[d->d_server],SIGQUIT);
+
+	if(mq_send(d_server_mq,(const char*)d,sizeof(d_server_command)+1,0)==-1) printf("%s\n",strerror(errno));
+
+	sem_trywait(s_client);
+	sem_post(s_d_server);
+	sem_wait(s_client);
 }

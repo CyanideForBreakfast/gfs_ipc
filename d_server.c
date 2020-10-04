@@ -60,6 +60,7 @@ int main(int argc, char* argv[]){
 
 	signal(SIGUSR1,handler);
 	signal(SIGUSR2,handler);
+	signal(SIGQUIT,handler);
 
 	while(1){
 		//wait till a signal is recieved
@@ -80,6 +81,13 @@ struct chunk_stored
 	long int type;
 	int status;
 };
+
+typedef struct d_server_command
+{
+	char command[MAX_CHUNK_SIZE];
+	int d_server;
+	char *args;
+} d_server_command;
 
 void handler(int signum){
 	//wait for semaphore release
@@ -107,8 +115,19 @@ void handler(int signum){
 		if(mq_send(client_mq, (const char*)&cs,sizeof(struct chunk_stored)+1,0)==-1) printf("%s\n",strerror(errno));
 		sem_trywait(s_d_server);
 		sem_post(s_client);
+		return;
 	}
 	if(signum == SIGUSR2){
 		printf("Someone called me %d sigusr2\n",getpid());
+	}
+	if(signum == SIGQUIT){
+		//recieve and execute command
+		d_server_command* d;
+		if(mq_receive(d_server_mq,buffer,BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
+		d = (d_server_command*)buffer;
+		system(d->command);
+		
+		sem_trywait(s_d_server);
+		sem_post(s_client);
 	}
 }
