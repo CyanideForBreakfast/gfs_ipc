@@ -67,6 +67,7 @@ int main(int argc, char* argv[]){
 	}
 	return 0;
 }
+
 struct actual_chunk
 {
 	long int type;
@@ -74,6 +75,12 @@ struct actual_chunk
 	long int chunk_id;
 	char data[MAX_CHUNK_SIZE];
 };
+struct chunk_stored
+{
+	long int type;
+	int status;
+};
+
 void handler(int signum){
 	//wait for semaphore release
 	sem_wait(s_d_server);
@@ -86,14 +93,20 @@ void handler(int signum){
 		//printf("%s\n",ac->data);
 
 		//write chunk to a file with name as chunk_id
+		int status=1;
 		char file_path[10];
 		sprintf(file_path, "%d/%ld",d_server_id,ac->chunk_id); 
 		FILE* fptr = fopen(file_path,"w+");
+		if(fptr==NULL) status=0;
 		fwrite((void*)ac->data,1,MAX_CHUNK_SIZE,fptr);
+		if(ferror(fptr)) status=0;
 		fclose(fptr);
 	
-		sem_post(s_client);
+		struct chunk_stored cs;
+		cs.status = status;
+		if(mq_send(client_mq, (const char*)&cs,sizeof(struct chunk_stored)+1,0)==-1) printf("%s\n",strerror(errno));
 		sem_trywait(s_d_server);
+		sem_post(s_client);
 	}
 	if(signum == SIGUSR2){
 		printf("Someone called me %d sigusr2\n",getpid());

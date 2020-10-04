@@ -418,9 +418,14 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 
 					//send chunk
 					if(mq_send(d_server_mq,(const char*)&c,sizeof(struct actual_chunk)+1,0)==-1) printf("%s\n",strerror(errno));
+					
 					sem_trywait(s_client);
 					sem_post(s_d_server);
 					sem_wait(s_client);
+
+					//recieve status
+					struct chunk_stored* cs;
+					if(mq_receive(client_mq,buffer,BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
 				}
 
 			};
