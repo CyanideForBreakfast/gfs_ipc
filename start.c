@@ -11,10 +11,14 @@
 #include <sys/stat.h>
 #include <mqueue.h>
 #include <errno.h>
+#include <sys/mman.h>       
+
+#define MAX_D_SERVERS 50
 
 #define SEM_NAME_CLIENT "CLIENT"
 #define SEM_NAME_M_SERVER "M_SERVER"
 #define SEM_NAME_D_SERVER "D_SERVER"
+#define SHARED_MEMORY_PIDS_NAME "D_SERVERS_PIDS"
 
 int m_server_mq, client_mq, d_server_mq;
 char client_path[] = "/client.c"; char m_server_path[] = "/m_server.c"; char d_server_path[] = "/d_server.c";
@@ -69,24 +73,38 @@ int main(){
 	mqd_t d_server_mq = mq_open(d_server_path,O_CREAT | O_RDWR,0644,&attr);
 	if(d_server_mq==-1) printf("d_server_mq %s start.c\n",strerror(errno));
 
-
-	//start m_server
-	char arg_for_m[10];
-	sprintf(arg_for_m,"%d",num_d_servers);
-	char* m_file[] = {"./m_server",arg_for_m,NULL};
-	pid_t pid = fork();	
-	if(pid==0) {printf("M_SERVER PID %d\n",getpid());execv("./m_server",m_file);}
+	pid_t pid;
 
 	//start d_servers
+	//for storing pids
+	pid_t d_servers_pids[MAX_D_SERVERS];
 	for(int i=0;i<num_d_servers;i++){
 		char num_str[10];
 		sprintf(num_str,"%d",i);
 		char* d_file[] = {"./d_server",num_str,NULL};
 		pid = fork();
 		if(pid==0) execv("./d_server",d_file);
+		printf("start.c pid: %d\n",pid);
+		d_servers_pids[i] = pid;
 	}
+	//open a shared memory for sharing d_servers pids
+	int sm_pids = shm_open(SHARED_MEMORY_PIDS_NAME,O_CREAT | O_RDWR, S_IRWXU);
+	ftruncate(sm_pids,MAX_D_SERVERS*sizeof(pid_t));
+	void* ptr = mmap(NULL,MAX_D_SERVERS*sizeof(pid_t),PROT_READ | PROT_WRITE, MAP_SHARED,sm_pids,0);
+	pid_t* d_servers_pids_array = (pid_t*)ptr;
+	for(int i=0;i<num_d_servers;i++) d_servers_pids_array[i] = d_servers_pids[i];
+	
+	//start m_server
+	char arg_for_m[10];
+	sprintf(arg_for_m,"%d",num_d_servers);
+	char* m_file[] = {"./m_server",arg_for_m,NULL};
+	pid = fork();	
+	if(pid==0) {printf("M_SERVER PID %d\n",getpid());execv("./m_server",m_file);}
+
 	//start client
-	char* c_file[] = {"./client",NULL};
+	char arg_for_client[10];
+	sprintf(arg_for_client,"%d",num_d_servers);
+	char* c_file[] = {"./client",arg_for_client,NULL};
 	pid = fork();
 	if(pid==0) execv("./client",c_file);
 

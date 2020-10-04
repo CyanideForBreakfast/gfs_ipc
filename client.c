@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <mqueue.h>
 #include <errno.h>
+#include <sys/mman.h>
 
 /*
  ****WARNING****
@@ -23,12 +24,17 @@
 #define NUM_SUBDIRS 10
 #define NUM_FILES 10
 #define MAX_CHUNK_SIZE 500
+#define MAX_D_SERVERS 50
 
 #define SEM_NAME_CLIENT "CLIENT"
 #define SEM_NAME_M_SERVER "M_SERVER"
 #define SEM_NAME_D_SERVER "D_SERVER"
+#define SHARED_MEMORY_PIDS_NAME "D_SERVERS_PIDS"
 
 char buffer[BUFFER_SIZE];
+
+int num_d_servers;
+pid_t d_servers_pids_array[MAX_D_SERVERS];
 
 sem_t *s_client;
 sem_t *s_m_server;
@@ -85,8 +91,18 @@ void parse_and_execute(char *);
 void execute_m_server_commands(m_server_command *, int); //takes command type as second arg - 0:addf,1:rm,2:mv,3:cp
 void execute_d_server_commands(d_server_command *);
 
-int main()
+int main(int argc, char* argv[])
 {
+	//read and store pids from shared memory
+	num_d_servers = atoi(argv[1]);
+	int sm_pids = shm_open(SHARED_MEMORY_PIDS_NAME, O_RDONLY, 0);
+	void* ptr = mmap(NULL,MAX_D_SERVERS*sizeof(pid_t),PROT_READ, MAP_SHARED, sm_pids, 0);
+	pid_t* pid_t_ptr = (pid_t*)ptr;
+	for(int i=0;i<num_d_servers;i++){
+		d_servers_pids_array[i] = pid_t_ptr[i];
+	}
+	
+	//set semaphores
 	s_client = sem_open(SEM_NAME_CLIENT, O_RDWR);
 	s_m_server = sem_open(SEM_NAME_M_SERVER, O_RDWR);
 	s_d_server = sem_open(SEM_NAME_D_SERVER, O_RDWR);
@@ -381,9 +397,12 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 				sem_trywait(s_client);
 				sem_wait(s_client);
 
+				//recieve d_server_ids to store the data
 				if(mq_receive(client_mq,buffer,BUFFER_SIZE,NULL)==-11) printf("%s",strerror(errno));
 				ca = (struct chunk_added*)buffer;
 				printf("recieved id : %ld for chunk %d , %d %d %d\n",(*ca).chunk_id, chunk_num, (*ca).d_servers[0],(*ca).d_servers[1],(*ca).d_servers[2]);
+
+
 			};
 			acr.term=1;
 			if(mq_send(m_server_mq,(const char*)&acr,sizeof(struct add_chunk_request)+1,0)==-1) printf("%s",strerror(errno)); //send chunking terminated message
