@@ -206,7 +206,7 @@ void handle_command(struct command recieved_command){
 			f->chunk_capacity=DEF_NUM_CHUNK;
 			f->chunks = (chunk*)malloc(DEF_NUM_CHUNK*sizeof(chunk));
 
-			printf("%s added to %s successfully\n",recieved_command.src,recieved_command.dest);
+			printf("File hierarchy: %s added to %s.\n",recieved_command.src,recieved_command.dest);
 
 			//print_hierarchy(root);
 
@@ -278,7 +278,9 @@ void handle_command(struct command recieved_command){
 
 				//printf("recieved %d\n",(*acr).chunk_num);
 			} while((*acr).term!=1);
-			printf("command terminated \n");
+			printf("Addition successful.\n");
+			printf("New hierarchy:\n");
+			print_hierarchy(root);
 
 			sem_trywait(s_m_server);
 			sem_post(s_client);
@@ -319,6 +321,9 @@ void handle_command(struct command recieved_command){
 			//remove decrement parent's file_num and hence remove file
 			((dir*)(to_rm_file->par))->num_files--;
 
+			printf("Removed.\n");
+			printf("New hierarchy:\n");
+			print_hierarchy(root);
 			sem_trywait(s_m_server);
 			sem_post(s_client);
 			return;
@@ -347,6 +352,11 @@ void handle_command(struct command recieved_command){
 
 			//printf("after moving: \n");
 			//print_hierarchy(root);
+
+			printf("Moved.\n");
+			printf("New hierarchy:\n");
+			print_hierarchy(root);
+
 			sem_trywait(s_m_server);
 			sem_post(s_client);
 			return;
@@ -377,12 +387,16 @@ void handle_command(struct command recieved_command){
 
 					if(mq_send(d_server_mq,(const char*)&doc,sizeof(struct do_on_chunk)+1,0)==-1) printf("%s\n",strerror(errno));
 
+
 					sem_trywait(s_m_server);
 					sem_post(s_d_server);
 					sem_wait(s_m_server);
 				}
 			}
 
+			printf("Copied.\n");
+			printf("New hierarchy:\n");
+			print_hierarchy(root);
 			sem_trywait(s_m_server);
 			sem_post(s_client);
 			return;
