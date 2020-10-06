@@ -161,7 +161,9 @@ void handler(int signum){
 		d_server_command* d;
 		if(mq_receive(d_server_mq,buffer,BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
 		d = (d_server_command*)buffer;
-		system(d->command);
+		char command_to_execute[100];
+		sprintf(command_to_execute,"cd %d && %s && cd ..",d->d_server,d->command);
+		system(command_to_execute);
 		
 		sem_trywait(s_d_server);
 		sem_post(s_client);
