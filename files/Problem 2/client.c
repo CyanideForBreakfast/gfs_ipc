@@ -401,7 +401,7 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 				acr.chunk_num = chunk_num++;
 
 				strcpy(acr.file_path,m->a.m_server_path);
-				//printf("chunk %d: %s\n",chunk_num,(c.data));
+
 				if(mq_send(m_server_mq,(const char*)&acr,sizeof(struct add_chunk_request)+1,0)==-1) printf("%s",strerror(errno));
 
 				sem_post(s_m_server);
@@ -425,7 +425,6 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 					kill(d_servers_pids_array[(*ca).d_servers[i]],SIGUSR1);
 
 					//send chunk
-					//printf("Sending: %s\n",c.data);
 					if(mq_send(d_server_mq,(const char*)&c,sizeof(struct actual_chunk)+1,0)==-1) printf("%s\n",strerror(errno));
 					
 					sem_trywait(s_client);
@@ -444,17 +443,7 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			sem_post(s_m_server);
 			sem_trywait(s_client);
 			sem_wait(s_client);
-
-			/*
-			printf("Finally: \n");
-			struct mq_attr* info = (struct mq_attr*) malloc(sizeof(struct mq_attr));
-			mq_getattr(client_mq,info);
-			printf("client_mq pending messages: %ld\n",info->mq_curmsgs);
-			mq_getattr(m_server_mq,info);
-			printf("m_server_mq pending messages: %ld\n",info->mq_curmsgs);
-			mq_getattr(d_server_mq,info);
-			printf("d_server_mq pending messages: %ld\n",info->mq_curmsgs);
-			*/
+			
 			break;
 		case 1:
 			//rm
@@ -471,7 +460,7 @@ void execute_m_server_commands(m_server_command *m, int command_type)
 			sem_post(s_m_server);
 			sem_trywait(s_client);
 			sem_wait(s_client);
-			//printf("Removed.\n");
+			printf("Removed");
 			break;
 
 		case 2:
@@ -530,7 +519,6 @@ FILE *next_chunk(FILE *fptr, struct actual_chunk *cptr, int chunk_size)
 	int bytes = fread(buf,chunk_size,1,fptr);
 	//possible bug : resolve putting \0 at the end of buf when read
 	strcpy(cptr->data,buf);
-	(cptr->data)[bytes] = EOF;
 	strcat(cptr->data,"\0");
 	return fptr;
 }

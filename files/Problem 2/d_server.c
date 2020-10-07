@@ -113,7 +113,7 @@ void handler(int signum){
 		//recieve chunk
 		if(mq_receive(d_server_mq,buffer,BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
 		ac = (struct actual_chunk*)buffer;
-		//printf("Recieving: %s\n",ac->data);
+		//printf("%s\n",ac->data);
 
 		//write chunk to a file with name as chunk_id
 		int status=1;
@@ -146,7 +146,7 @@ void handler(int signum){
 		}
 		if(doc->action==1){
 			char file_path[50];
-			sprintf(file_path, "cp %d/%ld %d/%ld 2>/dev/null",d_server_id,doc->old_chunk_id,d_server_id,doc->new_chunk_id);
+			sprintf(file_path, "cp %d/%ld %d/%ld",d_server_id,doc->old_chunk_id,d_server_id,doc->new_chunk_id);
 			system(file_path);
 			//printf("copied\n");
 		}
@@ -161,9 +161,7 @@ void handler(int signum){
 		d_server_command* d;
 		if(mq_receive(d_server_mq,buffer,BUFFER_SIZE,NULL)==-1) printf("%s\n",strerror(errno));
 		d = (d_server_command*)buffer;
-		char command_to_execute[100];
-		sprintf(command_to_execute,"cd %d && %s && cd ..",d->d_server,d->command);
-		system(command_to_execute);
+		system(d->command);
 		
 		sem_trywait(s_d_server);
 		sem_post(s_client);

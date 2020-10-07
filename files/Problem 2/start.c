@@ -26,7 +26,7 @@ char client_path[] = "/client.c"; char m_server_path[] = "/m_server.c"; char d_s
 	
 void close_prog(int);
 void close_prog(int sig){
-	printf("\nClosing ....\n");
+	printf("\nClosing program ....\n");
 	mq_unlink(client_path);
 	mq_unlink(m_server_path);
 	mq_unlink(d_server_path);
@@ -56,7 +56,7 @@ int main(){
 	system("gcc -o m_server m_server.c -lpthread -lrt");
 	system("gcc -o d_server d_server.c -lpthread -lrt");
 
-	printf("Starting servers ...\n");
+	printf("Starting servers .......\n");
 	
 	/*
 	 * creating message queues
@@ -107,16 +107,12 @@ int main(){
 	pid = fork();	
 	if(pid==0) {execv("./m_server",m_file);}
 
-	printf("Servers started.\n");
-
 	//start client
-	/*
 	char arg_for_client[10];
 	sprintf(arg_for_client,"%d",num_d_servers);
 	char* c_file[] = {"./client",arg_for_client,NULL};
 	pid = fork();
 	if(pid==0) execv("./client",c_file);
-	*/
 
 	signal(SIGINT,close_prog);
 	pause();
