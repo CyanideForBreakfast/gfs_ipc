@@ -548,4 +548,7 @@ void execute_d_server_commands(d_server_command *d)
 	sem_trywait(s_client);
 	sem_post(s_d_server);
 	sem_wait(s_client);
+
+	system("cat d_server_command_result");
+	system("rm d_server_command_result");
 }

@@ -163,7 +163,12 @@ void handler(int signum){
 		d = (d_server_command*)buffer;
 		char command_to_execute[100];
 		sprintf(command_to_execute,"cd %d && %s && cd ..",d->d_server,d->command);
+
+		//creating a temp file
+		FILE* fptr = fopen("d_server_command_result","w");
+		dup2(fileno(fptr),STDOUT_FILENO);
 		system(command_to_execute);
+		dup2(fileno(stdout),STDOUT_FILENO);
 		
 		sem_trywait(s_d_server);
 		sem_post(s_client);
